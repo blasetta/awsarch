@@ -1,0 +1,931 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Architecting on AWS - Interactive Course Outline</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Chosen Palette: Calm Harmony (Primary Blue: #156CE0, Accent Orange: rgb(255, 140, 0), Grays: Tailwind defaults) -->
+    <!-- Application Structure Plan: The application uses a persistent sidebar for primary navigation, allowing users to select any module at any time. The main content area dynamically renders the details of the selected module, including key topics, lab information, and an interactive knowledge check section. A visual, timeline-style "Course Roadmap" is included at the top to provide a high-level overview of the learning path, which is also interactive. This structure was chosen to provide both a quick, high-level overview and deep-dive capability without leaving the page, enhancing user orientation and making the dense curriculum feel manageable and easy to explore. A new 'Course Overview' section has been added as the default landing page for a high-level understanding of the entire training. -->
+    <!-- Visualization & Content Choices: 
+        - Report Info: Course structure of 13 modules. Goal: Organize/Show Progression. Viz/Method: Interactive HTML/CSS timeline diagram. Interaction: Clicking a module on the timeline navigates to its content. Justification: More engaging and informative than a static list, visually representing the learning journey.
+        - Report Info: Module knowledge check questions. Goal: Inform/Self-Assess. Viz/Method: Interactive cards with a "Reveal Answer" button. Interaction: Click to show the correct answer. Justification: Encourages active recall and engagement over passive reading.
+        - Report Info: Detailed comparisons (e.g., Storage types, Database types). Goal: Compare. Viz/Method: Styled HTML tables. Interaction: Row hover effects. Justification: Best method for direct feature-by-feature comparison.
+        - New 'Course Overview' section: Goal: Provide high-level summary. Viz/Method: Formatted text with bullet points and bolding. Interaction: None, serves as an introductory overview.
+        - All visual elements like icons and diagrams are built with HTML/Unicode and styled with Tailwind to adhere to constraints.
+    -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #F9FAFB;
+        }
+        .module-nav-item.active {
+            background-color: #156CE0;
+            color: white;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .module-nav-item.active .module-icon {
+            filter: brightness(0) invert(1);
+        }
+        .roadmap-node.active .roadmap-circle {
+            background-color: #156CE0;
+            border-color: #156CE0;
+            color: white;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+        .roadmap-node.active .roadmap-label {
+            font-weight: 700;
+            color: #156CE0;
+        }
+        .roadmap-connector {
+            background-color: rgb(255, 140, 0); /* Accent Orange */
+        }
+        .knowledge-check-card .answer-revealed {
+            background-color: #dcfce7 !important;
+            border-left-color: #22c55e !important;
+        }
+        .smooth-transition {
+            transition: all 0.3s ease-in-out;
+        }
+        .content-fade-in {
+            animation: fadeIn 0.5s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        /* Custom styles for table borders */
+        .table-border th, .table-border td {
+            border: 1px solid #e5e7eb; /* Tailwind gray-200 */
+        }
+    </style>
+</head>
+<body class="text-gray-800">
+
+    <div class="flex h-screen bg-gray-50">
+        <aside id="sidebar" class="w-64 bg-white shadow-lg flex-shrink-0 flex-col justify-between hidden md:flex rounded-r-lg">
+            <div>
+                <div class="p-5 border-b border-gray-100">
+                    <h1 class="text-2xl font-bold text-gray-800">Architecting on AWS</h1>
+                    <p class="text-sm text-gray-500 mt-1">Interactive Course Outline</p>
+                </div>
+                <nav id="module-navigation" class="p-3 space-y-2"></nav>
+            </div>
+            <div class="p-4 border-t border-gray-100 text-xs text-gray-400">
+                <p>Designed for learning & exploration</p>
+                <p>&copy; 2025</p>
+            </div>
+        </aside>
+
+        <div class="flex-1 flex flex-col overflow-hidden">
+            <header class="bg-white shadow-md p-4 flex items-center justify-between md:hidden">
+                <h1 class="text-xl font-bold text-gray-800">Architecting on AWS</h1>
+                <button id="menu-button" class="p-2 rounded-md text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-[#156CE0]">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"></path></svg>
+                </button>
+            </header>
+            
+            <main id="main-content" class="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 p-6 sm:p-8 lg:p-10">
+            </main>
+        </div>
+    </div>
+    
+    <div id="mobile-menu" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden md:hidden">
+        <div class="fixed inset-y-0 left-0 w-64 bg-white shadow-xl p-4 transform -translate-x-full smooth-transition">
+             <div class="flex items-center justify-between mb-4">
+                <h2 class="text-lg font-bold">Modules</h2>
+                <button id="close-menu-button" class="p-2 rounded-md text-gray-500 hover:bg-gray-100">&times;</button>
+            </div>
+            <nav id="mobile-module-navigation" class="space-y-1"></nav>
+        </div>
+    </div>
+
+
+    <script>
+        const courseData = {
+            modules: [
+                { id: 0, title: 'Course Overview', lab: null }, // New overview item
+                { id: 1, title: 'Architecting Fundamentals', lab: 'Explore and Interact with the AWS Management Console and AWS Command Line Interface' },
+                { id: 2, title: 'Account Security', lab: null },
+                { id: 3, title: 'Networking 1', lab: 'Build your Amazon VPC Infrastructure' },
+                { id: 4, title: 'Compute', lab: null },
+                { id: 5, title: 'Storage', lab: 'Create a Database Layer in Your Amazon VPC Infrastructure' },
+                { id: 6, title: 'Database Services', lab: null },
+                { id: 7, title: 'Monitoring and Scaling', lab: 'Configure High Availability in Your Amazon VPC' },
+                { id: 8, title: 'Automation', lab: null },
+                { id: 9, title: 'Containers', lab: 'Build a Serverless Architecture' },
+                { id: 10, title: 'Networking 2', lab: null },
+                { id: 11, title: 'Serverless', lab: 'Configure an Amazon CloudFront Distribution with an Amazon S3 Origin' },
+                { id: 12, title: 'Edge Services', lab: null },
+                { id: 13, title: 'Backup and Recovery', lab: 'Build an AWS Multi-Tier Architecture (Capstone)' },
+            ],
+            overviewContent: `
+                <article class="bg-white p-8 rounded-xl shadow-lg">
+                    <h2 class="text-4xl font-bold text-gray-900 leading-tight mb-6">Architecting on AWS: Course Outline</h2>
+                    <p class="text-lg text-gray-600 mb-6">This course is designed to teach you how to build highly available, scalable, fault-tolerant, and cost-effective applications on AWS. Below is a comprehensive overview of the modules and associated hands-on labs.</p>
+                    <ul class="list-disc pl-8 space-y-3 text-gray-700 text-base">
+                        <li><strong>Module 1: Architecting Fundamentals</strong> - Introduces core AWS concepts, the global infrastructure, and the Well-Architected Framework.
+                            <ul class="list-circle pl-6 mt-1 text-sm text-gray-600">
+                                <li><em>Lab 1: Explore and Interact with the AWS Management Console and AWS Command Line Interface</em></li>
+                            </ul>
+                        </li>
+                        <li><strong>Module 2: Account Security</strong> - Covers identity management, access control, and strategies for securing and governing single and multiple AWS accounts.</li>
+                        <li><strong>Module 3: Networking 1</strong> - Details the fundamentals of creating and securing a virtual private network in AWS using Amazon VPC.
+                            <ul class="list-circle pl-6 mt-1 text-sm text-gray-600">
+                                <li><em>Lab 2: Build your Amazon VPC Infrastructure</em></li>
+                            </ul>
+                        </li>
+                        <li><strong>Module 4: Compute</strong> - Explores virtual server hosting with Amazon EC2, instance storage, pricing models, and serverless compute with AWS Lambda.</li>
+                        <li><strong>Module 5: Storage</strong> - Compares object, file, and block storage models and covers data management and migration services.
+                            <ul class="list-circle pl-6 mt-1 text-sm text-gray-600">
+                                <li><em>Lab 3: Create a Database Layer in Your Amazon VPC Infrastructure</em></li>
+                            </ul>
+                        </li>
+                        <li><strong>Module 6: Database Services</strong> - Provides an overview of AWS's portfolio of managed relational and NoSQL databases, caching, and migration tools.</li>
+                        <li><strong>Module 7: Monitoring and Scaling</strong> - Focuses on monitoring, logging, and setting alarms, as well as strategies for load balancing and automatic scaling.
+                            <ul class="list-circle pl-6 mt-1 text-sm text-gray-600">
+                                <li><em>Lab 4: Configure High Availability in Your Amazon VPC</em></li>
+                            </ul>
+                        </li>
+                        <li><strong>Module 8: Automation</strong> - Introduces Infrastructure as Code (IaC) and tools like AWS CloudFormation and AWS CDK for automating infrastructure deployment.</li>
+                        <li><strong>Module 9: Containers</strong> - Explains microservice architectures and the AWS services for running and managing containerized applications, such as Amazon ECS and EKS.
+                            <ul class="list-circle pl-6 mt-1 text-sm text-gray-600">
+                                <li><em>Lab 5: Build a Serverless Architecture</em></li>
+                            </ul>
+                        </li>
+                        <li><strong>Module 10: Networking 2</strong> - Covers advanced networking topics, including hybrid connectivity, VPC peering, and simplified global network management.</li>
+                        <li><strong>Module 11: Serverless</strong> - Expands on serverless concepts, covering architecture patterns with AWS Lambda, Amazon API Gateway, and other event-driven services.</li>
+                        <li><strong>Module 12: Edge Services</strong> - Focuses on services at the AWS edge, including content delivery with Amazon CloudFront and DNS with Amazon Route 53.
+                            <ul class="list-circle pl-6 mt-1 text-sm text-gray-600">
+                                <li><em>Lab 6: Configure an Amazon CloudFront Distribution with an Amazon S3 Origin</em></li>
+                            </ul>
+                        </li>
+                        <li><strong>Module 13: Backup and Recovery</strong> - Details strategies and services for data backup, disaster recovery (DR), and ensuring business continuity.
+                            <ul class="list-circle pl-6 mt-1 text-sm text-gray-600">
+                                <li><em>Capstone Lab: Build an AWS Multi-Tier Architecture</em></li>
+                            </ul>
+                        </li>
+                    </ul>
+                </article>
+            `,
+            content: {
+                1: {
+                    title: "Module 1: Architecting Fundamentals",
+                    description: "This module introduces core AWS concepts, the global infrastructure, and the Well-Architected Framework. It establishes the foundation for making informed architectural decisions on AWS.",
+                    topics: [
+                        { title: 'AWS Global Infrastructure', content: `AWS infrastructure is built around Regions and Availability Zones (AZs).
+                            <ul class='list-disc pl-5 mt-2 space-y-2'>
+                                <li>A **Region** is a physical location in the world with multiple AZs. Regions are completely independent from each other.</li>
+                                <li>**Availability Zones** consist of one or more discrete data centers, each with redundant power, networking, and connectivity, housed in separate facilities. They are designed for fault isolation.</li>
+                                <li>AZs within a Region are interconnected by using high-speed, low-latency private links, enabling synchronous replication between them for high availability.</li>
+                                <li>This multi-AZ design allows for high availability and fault tolerance, as issues in one AZ are isolated and do not impact others.</li>
+                            </ul>`},
+                        { title: 'Well-Architected Framework', content: `A framework of best practices for building secure, high-performing, resilient, and efficient infrastructure. It is built on six pillars:
+                            <ul class='list-disc pl-5 mt-2 space-y-1'>
+                                <li>**Operational Excellence**: Focuses on running and monitoring systems to deliver business value and continuously improving processes and procedures.</li>
+                                <li>**Security**: Concentrates on protecting information, systems, and assets while delivering business value.</li>
+                                <li>**Reliability**: Ensures a workload performs its intended function correctly and consistently when it's expected to.</li>
+                                <li>**Performance Efficiency**: Focuses on using computing resources efficiently to meet system requirements and maintain that efficiency as demand changes.</li>
+                                <li>**Cost Optimization**: Aims to avoid unnecessary costs.</li>
+                                <li>**Sustainability**: Focuses on minimizing the environmental impacts of running cloud workloads.</li>
+                            </ul>`},
+                        { title: 'Choosing a Region', content: `Key factors to consider when selecting an AWS Region include:
+                            <ul class='list-disc pl-5 mt-2'>
+                                <li>**Data Governance**: Compliance with local data residency laws.</li>
+                                <li>**Latency**: Proximity to your end-users for faster response times.</li>
+                                <li>**Service Availability**: Not all services are available in all Regions.</li>
+                                <li>**Cost**: Pricing can vary between Regions.</li>
+                            </ul>`},
+                    ],
+                    knowledgeCheck: [
+                        { q: 'What is the primary benefit of deploying applications into multiple Availability Zones?', o: ['Stronger security policies', 'Decreased latency to resources', 'High availability for resources', 'No benefit'], a: 2 },
+                        { q: 'Which AWS Well-Architected Framework pillar contains the principle of least privilege?', o: ['Operational excellence', 'Security', 'Reliability', 'Performance efficiency'], a: 1 },
+                    ]
+                },
+                2: {
+                    title: "Module 2: Account Security",
+                    description: "This module covers identity management, access control, and strategies for securing and governing single and multiple AWS accounts. You will learn about IAM, policies, and AWS Organizations.",
+                    topics: [
+                         { title: 'IAM: Users, Groups, and Roles', content: `AWS Identity and Access Management (IAM) is the central service for managing access.
+                            <ul class='list-disc pl-5 mt-2 space-y-1'>
+                                <li>**Users** represent people or applications that interact with AWS.</li>
+                                <li>**Groups** are collections of users, making it easier to manage permissions for multiple users.</li>
+                                <li>**Roles** are IAM identities that you can create in your account that have specific permissions. They are ideal for granting temporary access to AWS resources.</li>
+                            </ul>`},
+                         { title: 'Security Policies', content: `**Policies** are JSON documents that define permissions.
+                            <ul class='list-disc pl-5 mt-2 space-y-1'>
+                                <li>**Identity-based policies** are attached to IAM users, groups, or roles, defining what those identities can do.</li>
+                                <li>**Resource-based policies** are attached to a resource (like an S3 bucket or SQS queue) and specify who has access to that resource and what actions they can perform.</li>
+                                <li>An explicit **Deny** in any policy always overrides an **Allow**, acting as a powerful security control.</li>
+                            </ul>`},
+                         { title: 'AWS Organizations', content: `**AWS Organizations** is a service for centrally managing and governing multiple AWS accounts.
+                            <ul class='list-disc pl-5 mt-2 space-y-1'>
+                                <li>It enables **consolidated billing**, providing a single bill for all accounts in your organization.</li>
+                                <li>Accounts can be organized hierarchically into **Organizational Units (OUs)**.</li>
+                                <li>**Service Control Policies (SCPs)** can be applied to OUs or individual accounts to specify the maximum available permissions for entities within those accounts, providing consistent governance.</li>
+                            </ul>`},
+                        { title: 'Important Considerations for IAM', content: `
+                            <ul class="list-disc pl-5 mt-2 space-y-2">
+                                <li>For production use, AWS recommends human users leverage **federation** with an identity provider (IdP) for temporary credentials, often through **AWS IAM Identity Center**, instead of long-term IAM user credentials.</li>
+                                <li>When creating users, adhere to the **principle of least privilege**, granting only the minimum necessary permissions.</li>
+                                <li>For console access, IAM users require passwords. **MFA** should be enabled for all IAM users with console passwords.</li>
+                            </ul>
+                            `},
+                        { title: 'Assuming an IAM Role', content: `
+                            "Assuming a role" means that an IAM entity (an IAM User, another IAM Role, or a federated user) temporarily borrows the permissions of an IAM Role. This process is facilitated by the **AWS Security Token Service (STS)**.
+                            <ul class="list-disc pl-5 mt-2 space-y-2">
+                                <li>**Temporary Credentials**: When you assume a role, you get short-lived temporary credentials (typically valid for 15 minutes to 12 hours). If these credentials are compromised, their utility is limited by their short lifespan.</li>
+                                <li>**No Credential Sharing**: You never need to share a static "admin" password or access key. Each user or service assumes the role using their own unique identity.</li>
+                                <li>**Auditability and Traceability**: Every **sts:AssumeRole** API call is logged in AWS CloudTrail, showing who assumed what role and when. Subsequent actions are also logged, with the **userIdentity** clearly indicating the assumed role and the original user who assumed it.</li>
+                                <li>**Cross-Account Access**: Assuming a role is the standard and most secure way to grant permissions to users or services in one AWS account to perform actions in another.</li>
+                            </ul>
+                            `},
+                        { title: 'Configuring Programmatic Access with aws configure', content: `
+                            The **aws configure** command is the entry point to setting up the AWS CLI's credential and configuration profiles. Its true power lies in managing multiple AWS identities and preferences.
+                            <h5 class="font-semibold mt-3 mb-1 text-gray-800">Interactive Process:</h5>
+                            <p>When you execute **aws configure** (or **aws configure --profile <profile-name>**), the CLI guides you through four essential inputs:</p>
+                            <ul class="list-disc pl-5 mt-2 space-y-2">
+                                <li>**AWS Access Key ID**: The public part of a programmatic credential (e.g., **AKIA...**). For enhanced security, best practice is to use temporary credentials from IAM Identity Center (AWS SSO) or an assumed role instead of long-lived IAM user access keys.</li>
+                                <li>**AWS Secret Access Key**: The private, confidential part of the credential. It must be treated with the same level of confidentiality as a password and should never be hardcoded or committed to version control.</li>
+                                <li>**Default Region Name**: The AWS Region (e.g., **eu-central-1**) that the CLI will use by default, avoiding the need to specify it with every command.</li>
+                                <li>**Default Output Format**: Determines how the CLI formats API responses. Options include **json** (ideal for scripting), **text**, and **table** (for human readability).</li>
+                            </ul>
+                            <h5 class="font-semibold mt-3 mb-1 text-gray-800">Configuration Files:</h5>
+                            <p>The command stores information in two files within a **.aws** directory in the user's home folder:</p>
+                            <ul class="list-disc pl-5 mt-2 space-y-2">
+                                <li>**~/.aws/credentials**: Securely stores the **aws_access_key_id** and **aws_secret_access_key**. This file should have strict permissions (e.g., **chmod 600**) so only the owner can read it.</li>
+                                <li>**~/.aws/config**: Stores the default region, output format, and definitions for named profiles.</li>
+                            </ul>
+                            <h5 class="font-semibold mt-3 mb-1 text-gray-800">Managing Multiple Identities with Profiles:</h5>
+                            <p>For managing multiple accounts or roles, named profiles are essential. A new profile is created using the **--profile** flag (e.g., **aws configure --profile dev-account**). This creates a separate named section in the config and credentials files. To use a profile, either append **--profile <profile-name>** to a command or set the **AWS_PROFILE** environment variable.</p>
+                            <h5 class="font-semibold mt-3 mb-1 text-gray-800">Advanced Authentication:</h5>
+                            <p>Beyond basic key setup, more secure and dynamic methods are preferred for professional environments:</p>
+                            <ul class="list-disc pl-5 mt-2 space-y-2">
+                                <li>**IAM Identity Center (AWS SSO) Integration**: Use **aws configure sso** to set up profiles that leverage short-lived, temporary credentials, which is the recommended best practice.</li>
+                                <li>**Assuming IAM Roles**: Profiles can be configured in the **~/.aws/config** file to assume an IAM role, which is crucial for cross-account access and privilege separation. The CLI handles the **sts:AssumeRole** call automatically.</li>
+                                <li>**EC2 Instance Profiles / ECS Task Roles**: For applications running on AWS compute services, attaching an IAM role directly to the resource is the most secure method. The AWS CLI and SDKs automatically retrieve temporary credentials from the instance metadata service, eliminating the need to store any credentials on the instance itself.</li>
+                            </ul>
+                            `},
+                        { title: 'Security Policies', content: `
+                            AWS Identity and Access Management (IAM) utilizes various policy types—JSON documents that define granular permissions—to control access to AWS resources. These policies specify who (principal) can perform what actions on which resources, and under what conditions. Key elements in a JSON policy include:
+                            <ul class="list-disc pl-5 mt-2 space-y-2">
+                                <li>**Effect**: **Allow** or **Deny**. By default, requests are denied unless explicitly allowed; an explicit **Deny** overrides any **Allow**.</li>
+                                <li>**Action**: Specific API operations (e.g., **ec2:RunInstances**).</li>
+                                <li>**Resource**: The AWS resource targeted by the action, identified by its Amazon Resource Name (**ARN**).</li>
+                                <li>**Condition**: Optional element to specify rules under which access is valid.</li>
+                            </ul>
+                            <h5 class="font-semibold mt-3 mb-1 text-gray-800">Here are the different IAM policy types:</h5>
+                            <h6 class="font-semibold mt-2 mb-1 text-gray-800">Identity-Based Policies:</h6>
+                            <p>These are JSON policy documents attached to an IAM identity (user, group, or role).</p>
+                            <ul class="list-disc pl-5 mt-2 space-y-2">
+                                <li>**AWS Managed Policies**: Standalone policies created and administered by AWS for common use cases (e.g., **AdministratorAccess**).</li>
+                                <li>**Customer Managed Policies**: Standalone policies you create and administer for your specific use cases, allowing for more granular control.</li>
+                                <li>**Inline Policies**: Policies embedded directly into a single IAM user, group, or role.</li>
+                            </ul>
+                            <h6 class="font-semibold mt-2 mb-1 text-gray-800">Resource-Based Policies:</h6>
+                            <p>These are JSON policy documents attached directly to a resource (e.g., an Amazon S3 bucket). They define what actions a specified principal can perform on that specific resource. A role's **Trust Policy** is a key example, as it defines which principals are allowed to assume the role.</p>
+                            <h5 class="font-semibold mt-3 mb-1 text-gray-800">Example: Trust Policy for Prod-DB-Admin-Role</h5>
+                            <pre class="bg-gray-100 p-3 rounded-md text-sm overflow-x-auto"><code>{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "AWS": "arn:aws:iam::111122223333:user/MariaDBA"
+      },
+      "Action": "sts:AssumeRole",
+      "Condition": {
+        "Bool": {
+          "aws:MultiFactorAuthPresent": "true"
+        }
+      }
+    }
+  ]
+}</code></pre>
+                            <h5 class="font-semibold mt-3 mb-1 text-gray-800">Permissions Boundaries:</h5>
+                            <p>An advanced feature that sets the maximum permissions an identity-based policy can grant to an IAM user or role.</p>
+                            <h5 class="font-semibold mt-3 mb-1 text-gray-800">Session Policies:</h5>
+                            <p>Advanced policies passed as a parameter when programmatically creating a temporary session for a role or federated user.</p>
+                            <h5 class="font-semibold mt-3 mb-1 text-gray-800">Comparing Session Policies and Permissions Boundaries</h5>
+                            <h6 class="font-semibold mt-2 mb-1 text-gray-800">AWS IAM Permissions Boundary</h6>
+                            <ul class="list-disc pl-5 mt-2 space-y-2">
+                                <li>**What it is**: A managed policy attached to an IAM user or role that defines the **maximum** permissions the identity can have.</li>
+                                <li>**How it works**: It acts as a permanent "outer guardrail." The effective permissions are the intersection of the identity's policies and the boundary. It can only restrict permissions, not grant them. It is persisted with the IAM identity until explicitly detached.</li>
+                                <li>**Primary Use Case**: Delegating administration with guardrails. A central security team can allow developers to create roles, but the boundary ensures those new roles can never exceed predefined permissions (e.g., preventing them from creating **iam:*** permissions). This is critical for preventing privilege escalation.</li>
+                                <li>**Analogy**: A speed limiter permanently installed in a car. No matter how hard you press the gas (identity policy), you cannot exceed the limiter's maximum speed (boundary).</li>
+                            </ul>
+                            <h6 class="font-semibold mt-2 mb-1 text-gray-800">AWS IAM Session Policies</h6>
+                            <ul class="list-disc pl-5 mt-2 space-y-2">
+                                <li>**What it is**: An inline policy passed as a parameter when programmatically creating a temporary session via AWS STS (e.g., **AssumeRole**).</li>
+                                <li>**How it works**: It acts as a **temporary** filter for a specific session only. The effective permissions are the intersection of the role's identity policies and the session policy. It is ephemeral and disappears when the session expires.</li>
+                                <li>**Primary Use Cases**: Just-in-time least privilege. An admin can assume a role with a session policy that scopes down their broad permissions to only the specific actions and resources needed for a single task. It's also used heavily in attribute-based access control (ABAC) with federated users to dynamically generate policies based on user attributes.</li>
+                                <li>**Analogy**: A temporary "valet key" for your car. The valet can drive the car (assume the role), but the key prevents them from opening the trunk or driving over a certain speed (the session policy restrictions). The restriction is only for that specific trip.</li>
+                            </ul>
+                            `},
+                        { title: 'Managing Multiple Accounts', content: `
+                            This section covers strategies for environments with more than one AWS account.
+                            <ul class="list-disc pl-5 mt-2 space-y-2">
+                                <li>**AWS Organizations**: A service for centrally governing and managing multiple accounts. It enables consolidated billing, hierarchical grouping of accounts into Organizational Units (**OUs**), and the application of **SCPs** for consistent governance.</li>
+                            </ul>
+                            `},
+                    ],
+                    knowledgeCheck: [
+                        { q: 'Which option can be attached to a user, group, or role?', o: ['Resource-based policies', 'AWS STS', 'Security groups', 'Identity-based policies'], a: 3 },
+                        { q: 'Which option sets permissions on a specific resource and requires a principal to be listed in the policy?', o: ['Identity-based policies', 'Service control policies (SCPs)', 'Resource-based policies', 'Permissions boundaries'], a: 2 },
+                        { q: 'Which options are elements of an IAM user’s long-term programmatic access? (Select TWO.)', o: ['Username', 'Access key ID', 'Password', 'Secret access key', 'Multi-factor authentication (MFA) token'], a: [1, 3] },
+                        { q: 'True or False: The root user should be used for daily administration of an AWS account.', o: ['True', 'False'], a: 1 },
+                        { q: 'Which option can only be managed with AWS Organizations?', o: ['Service control policies (SCPs)', 'Resource-based policies', 'Permissions boundaries', 'Identity-based policies'], a: 0 },
+                    ]
+                },
+                3: {
+                    title: "Module 3: Networking 1",
+                    description: "This module details the fundamentals of creating and securing a virtual private network in AWS using Amazon VPC. You'll learn about subnets, routing, and network security layers.",
+                    topics: [
+                        { title: 'Amazon Virtual Private Cloud (VPC)', content: `An **Amazon Virtual Private Cloud (VPC)** is a logically isolated section of the AWS Cloud where you can launch AWS resources in a virtual network that you define.
+                            <ul class='list-disc pl-5 mt-2 space-y-1'>
+                                <li>You have complete control over your virtual networking environment, including selection of your own IP address range.</li>
+                                <li>You can create subnets, and configure route tables and network gateways.</li>
+                                <li>VPCs provide a private, isolated network environment for your AWS resources.</li>
+                            </ul>`},
+                        { title: 'Subnets and Routing', content: `A VPC is divided into **subnets**, which are IP address ranges within the VPC tied to a specific Availability Zone.
+                            <ul class='list-disc pl-5 mt-2 space-y-1'>
+                                <li>**Public subnets** have a direct route to an **Internet Gateway**, allowing outbound internet access and inbound access if configured.</li>
+                                <li>**Private subnets** do not have a direct route to an Internet Gateway.</li>
+                                <li>A **NAT Gateway** allows instances in a private subnet to initiate outbound traffic to the internet while preventing inbound connections from the internet.</li>
+                                <li>**Route tables** contain a set of rules, called routes, that determine where network traffic from your subnet or gateway is directed.</li>
+                            </ul>`},
+                        { title: 'Network Security', content: `AWS provides multiple layers of network security within a VPC:
+                            <ul class='list-disc pl-5 mt-2 space-y-1'>
+                                <li>**Security Groups** act as a stateful firewall for instances, controlling inbound and outbound traffic at the instance level. They allow specified traffic and implicitly deny all other traffic.</li>
+                                <li>**Network Access Control Lists (NACLs)** are stateless firewalls operating at the subnet level. They provide an additional layer of defense and can be used to explicitly allow or deny specific traffic.</li>
+                            </ul>`},
+                        { title: 'In depth: Networking and Security Fundamentals', content: `
+                            <h5 class="font-semibold mt-3 mb-1 text-gray-800">IP Addressing:</h5>
+                            <p>This section covers the fundamentals of **IPv4** and **IPv6**, including **private address ranges (RFC 1918)** and **Classless Inter-Domain Routing (CIDR)** notation for defining network and subnet ranges.</p>
+                            <h5 class="font-semibold mt-3 mb-1 text-gray-800">Amazon Virtual Private Cloud (VPC) Fundamentals:</h5>
+                            <p>This section is a deep dive into creating a logically isolated section of the AWS Cloud.</p>
+                            <h6 class="font-semibold mt-2 mb-1 text-gray-800">VPC and Subnets:</h6>
+                            <p>Explains how a **VPC** is a virtual network dedicated to an AWS account and how it is divided into **subnets**, which are ranges of IP addresses within the VPC that are tied to a specific **Availability Zone**.</p>
+                            <h6 class="font-semibold mt-2 mb-1 text-gray-800">High Availability and Multi-AZ Deployments:</h6>
+                            <p>Deploying a VPC's subnets across multiple Availability Zones is a fundamental best practice for achieving **high availability** and **fault tolerance**. Because each **AZ** is a physically isolated set of data centers, an issue affecting one AZ (like a power outage or network failure) will not impact resources in other AZs. By creating subnets in multiple AZs and deploying application resources (like **EC2 instances** or **RDS databases**) across them, you can build systems that remain operational even if one AZ becomes unavailable. Services like **Elastic Load Balancing** can then distribute traffic to the healthy resources in the remaining AZs, ensuring business continuity.</p>
+                            <h6 class="font-semibold mt-2 mb-1 text-gray-800">Public vs. Private Subnets:</h6>
+                            <p>Differentiates between subnets with a direct route to the internet (**public**) and those without (**private**).</p>
+                            <h6 class="font-semibold mt-2 mb-1 text-gray-800">Routing:</h6>
+                            <p>Details the components that control traffic flow:</p>
+                            <ul class="list-disc pl-5 mt-2 space-y-2">
+                                <li>**Internet Gateway**: A horizontally scaled, redundant, and highly available VPC component that allows communication between the VPC and the internet.</li>
+                                <li>**Route Tables**: A set of rules, called routes, that are used to determine where network traffic from a subnet or gateway is directed.</li>
+                                <li>**NAT Gateway**: A **Network Address Translation (NAT)** service that enables instances in a private subnet to connect to the internet or other AWS services, but prevents the internet from initiating a connection with those instances.</li>
+                            </ul>
+                            <h5 class="font-semibold mt-3 mb-1 text-gray-800">VPC Traffic Security:</h5>
+                            <p>This section focuses on the layers of network security.</p>
+                            <h6 class="font-semibold mt-2 mb-1 text-gray-800">Overview of AWS Firewall Services:</h6>
+                            <p>Managing network security in AWS involves a suite of specialized firewall services, each operating at different layers and offering distinct capabilities.</p>
+                            <ul class="list-disc pl-5 mt-2 space-y-2">
+                                <li>**Amazon VPC Security Groups**: Act as a **stateful**, instance-level firewall (**Layer 4**) controlling inbound and outbound traffic for resources like **EC2 instances** and **RDS databases**. There is no additional charge for their use.</li>
+                                <li>**Amazon VPC Network ACLs (NACLs)**: Act as a **stateless**, subnet-level firewall, providing an additional layer of defense by allowing or denying traffic based on rules that are processed in numerical order. There is no additional charge for their use.</li>
+                                <li>**AWS Network Firewall**: A managed, **stateful firewall** and **intrusion prevention service (IPS)** that provides broad network protections for all VPCs. It inspects traffic at the packet level (**Layer 3/4**) and can filter both north-south (internet-facing) and east-west (inter-VPC) traffic. This is a paid, managed service.</li>
+                                <li>**Amazon Route 53 Resolver DNS Firewall**: Filters outbound DNS queries originating from within a VPC, helping to prevent resources from communicating with malicious domains. It operates at the **DNS layer** and can use AWS-managed domain lists.</li>
+                                <li>**AWS WAF (Web Application Firewall)**: Protects web applications and and **APIs** from common web exploits at the **application layer (Layer 7)**. It monitors **HTTP/S** requests and allows for highly customizable rules to block threats like **SQL injection** and **cross-site scripting**. It is a paid service with pricing based on rules and requests processed.</li>
+                                <li>**AWS Firewall Manager**: A management service that simplifies the administration of various AWS protections (**WAF**, **Shield Advanced**, **Security Groups**, **Network Firewall**, **DNS Firewall**) across multiple accounts within an **AWS Organization**, ensuring consistent policy enforcement. This is a paid service.</li>
+                            </ul>
+                            <p class="mt-2">It's also important to note that **AWS Shield Standard** provides automatic, no-cost **DDoS** protection for all customers at **Layers 3** and **4**.</p>
+                            <h6 class="font-semibold mt-2 mb-1 text-gray-800">Security Group Referencing (Chaining):</h6>
+                            <ul class="list-disc pl-5 mt-2 space-y-2">
+                                <li>**Core Concept**: Instead of relying solely on **CIDR blocks**, a security group rule can reference another security group as its source or destination. This allows traffic from any resource associated with the referenced security group.</li>
+                                <li>**Benefits**:
+                                    <ul class="list-circle pl-5 mt-1 space-y-1">
+                                        <li>**Simplified Management**: Reduces administrative overhead. If the **IP addresses** of resources in the referenced group change (e.g., due to **auto-scaling**), you do not need to update the rules in the referring security group.</li>
+                                        <li>**Dynamic Access**: The rules automatically adapt to changes in resource **IP addresses**.</li>
+                                    </ul>
+                                </li>
+                                <li>**Application Scope**: This applies to resources with an **Elastic Network Interface (ENI)**, such as **EC2 instances**, **ECS tasks**, **EKS pods**, or **RDS databases**.</li>
+                                <li>**Supported Scenarios**: Referencing is supported within the same **VPC**, across **peered VPCs**, and between **VPCs** connected to the same **AWS Transit Gateway** (if the feature is enabled).</li>
+                            </ul>
+                            <h6 class="font-semibold mt-2 mb-1 text-gray-800">Route Tables vs. Security Groups: A Detailed Comparison</h6>
+                            <p>In AWS networking, **Route Tables** and **Security Groups** are both fundamental components of **Amazon VPC**, but they operate at different layers and serve distinct purposes.</p>
+                            <h6 class="font-semibold mt-2 mb-1 text-gray-800">Route Table (**Layer 3** - Network Layer)</h6>
+                            <p>A **Route Table** contains a set of rules, called routes, that determine where network traffic from your subnet or gateway is directed. It operates at the **Network Layer (Layer 3)**, focusing on **IP addresses**.</p>
+                            <ul class="list-disc pl-5 mt-2 space-y-2">
+                                <li>**What it controls**: Packet forwarding, inter-subnet communication, and external communication to the internet, other **VPCs**, or on-premises networks.</li>
+                                <li>**Key Characteristics**:
+                                    <ul class="list-circle pl-5 mt-1 space-y-1">
+                                        <li>**Scope**: Associated with subnets. Every subnet must be associated with one route table.</li>
+                                        <li>**Rules (Routes)**: Each route specifies a destination **CIDR block** and a target (e.g., **Internet Gateway**, **NAT Gateway**).</li>
+                                        <li>**Stateless**: It directs packets based on destination, without remembering past connections.</li>
+                                    </ul>
+                                </li>
+                                <li>**Analogy**: A **Route Table** is like the **GPS** and street signs for a neighborhood (**subnet**). It tells network packets which road to take to reach their destination.</li>
+                            </ul>
+                            <h6 class="font-semibold mt-2 mb-1 text-gray-800">Security Group (**Layer 4** - Transport Layer)</h6>
+                            <p>A **Security Group** acts as a virtual **stateful firewall** for its associated resources (like **EC2 instances**). It operates at the **Transport Layer (Layer 4)**, focusing on protocols and port numbers.</p>
+                            <ul class="list-disc pl-5 mt-2 space-y-2">
+                                <li>**What it controls**: Inbound (**ingress**) and outbound (**egress**) traffic to and from resources.</li>
+                                <li>**Key Characteristics**:
+                                    <ul class="list-circle pl-5 mt-1 space-y-1">
+                                        <li>**Scope**: Associated with network interfaces (**ENIs**) on resources like **EC2 instances**.</li>
+                                        <li>**Default Deny**: All inbound traffic is denied unless explicitly allowed by a rule.</li>
+                                        <li>**Stateful**: If you allow inbound traffic, the corresponding outbound return traffic is automatically allowed, regardless of outbound rules.</li>
+                                        <li>**Rules**: You define "**allow**" rules based on protocol, port range, and source/destination (**IP CIDR** or another security group).</li>
+                                    </ul>
+                                </li>
+                                <li>**Analogy**: A **Security Group** is like the doorman and security system for an individual house (**EC2 instance**). It checks everyone trying to enter or leave against a whitelist.</li>
+                            </ul>
+                            <h6 class="font-semibold mt-2 mb-1 text-gray-800">Core Differences Summarized:</h6>
+                            <div class='overflow-x-auto'><table class='w-full text-left border-collapse mt-2 table-border'><thead><tr class='bg-gray-100'><th class='p-3 border'>Feature</th><th class='p-3 border'>Route Table</th><th class='p-3 border'>Security Group</th></tr></thead><tbody><tr><td class='p-3 border'>**Function**</td><td class='p-3 border'>Directs traffic (routing)</td><td class='p-3 border'>Filters traffic (firewall)</td></tr><tr><td class='p-3 border'>**Scope**</td><td class='p-3 border'>Subnet level</td><td class='p-3 border'>Instance/ENI level</td></tr><tr><td class='p-3 border'>**Layer**</td><td class='p-3 border'>**Layer 3** (Network)</td><td class='p-3 border'>**Layer 4** (Transport)</td></tr><tr><td class='p-3 border'>**Stateful?**</td><td class='p-3 border'>No (**Stateless**)</td><td class='p-3 border'>Yes (**Stateful**)</td></tr><tr><td class='p-3 border'>**"Allow/Deny"**</td><td class='p-3 border'>Determines paths</td><td class='p-3 border'>Allows or denies access</td></tr></tbody></table></div>
+                            <p class="mt-2">In essence, a packet first consults the **Route Table** to find its path, and then upon arrival, it is evaluated by the **Security Group** to see if it's allowed to enter the resource.</p>
+                            `},
+                    ],
+                    knowledgeCheck: [
+                        { q: 'True or False: A single Amazon Virtual Private Cloud (Amazon VPC) can span multiple Regions.', o: ['True', 'False'], a: 1 },
+                        { q: 'Which action must be taken to make a subnet public?', o: ['Route outbound traffic from the subnet.', 'Route inbound traffic from the internet gateway.', 'Route outbound traffic to the internet gateway.', 'Subnets are public by default.'], a: 2 },
+                        { q: 'Which function does the NAT gateway serve?', o: ['Load balances incoming traffic to multiple instances', 'Allows internet traffic initiated by private subnet instances', 'Allows instances to communicate between subnets', 'Increases security for instances in a public subnet'], a: 1 },
+                        { q: 'What should be used to create traffic filtering rules for a subnet?', o: ['NAT gateway', 'Route table', 'Security group', 'Network access control list (network ACL)'], a: 3 },
+                        { q: 'Which ports are open by default when a new security group is created? (Select TWO.)', o: ['Nothing is allowed inbound.', 'Nothing is allowed outbound.', 'Anything is allowed inbound.', 'Anything is allowed outbound.', 'Inbound traffic is allowed on public subnets.'], a: [0, 3] },
+                    ]
+                },
+                 4: {
+                    title: "Module 4: Compute",
+                    description: "Explores virtual server hosting with Amazon EC2, instance storage, pricing models, and serverless compute with AWS Lambda. This module covers the core compute services that power most applications on AWS.",
+                    topics: [
+                        { title: 'Amazon EC2', content: `**Amazon Elastic Compute Cloud (EC2)** provides scalable computing capacity in the AWS Cloud.
+                            <ul class='list-disc pl-5 mt-2 space-y-1'>
+                                <li>You launch virtual servers called **instances**, choosing from various **instance types** optimized for different tasks (e.g., compute, memory, storage optimized).</li>
+                                <li>An **Amazon Machine Image (AMI)** is a template that contains the software configuration (operating system, application server, and applications) required to launch your instance.</li>
+                                <li>EC2 instances are fundamental building blocks for many applications on AWS.</li>
+                            </ul>`},
+                        { title: 'EC2 Pricing Models', content: `AWS offers several ways to pay for EC2 to optimize costs:
+                            <ul class='list-disc pl-5 mt-2'>
+                                <li>**On-Demand**: Pay by the second or hour with no long-term commitment. Ideal for unpredictable workloads.</li>
+                                <li>**Savings Plans**: Flexible pricing model offering discounts for a 1-year or 3-year commitment to a consistent amount of compute usage.</li>
+                                <li>**Spot Instances**: Request spare EC2 capacity at discounts up to 90% compared to On-Demand prices. These instances can be interrupted by AWS if capacity is needed back, making them ideal for fault-tolerant workloads, batch jobs, or testing.</li>
+                                <li>**Reserved Instances (RIs)**: Provide a significant discount (up to 75%) compared to On-Demand prices for EC2 instances reserved for a 1-year or 3-year term.</li>
+                            </ul>`},
+                        { title: 'AWS Lambda', content: `**AWS Lambda** is a serverless, event-driven compute service that lets you run code without provisioning or managing servers.
+                            <ul class='list-disc pl-5 mt-2 space-y-1'>
+                                <li>You pay only for the compute time you consume, with no charge when your code is not running.</li>
+                                <li>Lambda functions can run for a maximum of 15 minutes per invocation.</li>
+                                <li>Functions can be configured with up to 10 GB of memory.</li>
+                                <li>It's ideal for building APIs, processing data from S3 or DynamoDB, and automating operational tasks.</li>
+                            </ul>`},
+                    ],
+                    knowledgeCheck: [
+                        { q: 'In the instance type name m7g.2xlarge, which aspect of the name indicates the generation of the instance family?', o: ['m', 'g', '2xlarge', '7'], a: 3 },
+                        { q: 'Which statements are true regarding AWS Lambda? (Select TWO.)', o: ['Functions currently only support Python.', 'You are responsible for updating and patching Lambda servers.', 'Functions can be allocated to up to 10 GB of memory.', 'Functions can run for a maximum of 15 minutes.', 'Functions require a security group.'], a: [2, 3] },
+                    ]
+                },
+                5: {
+                    title: "Module 5: Storage",
+                    description: "Compares object, file, and block storage models and covers data management and migration services. Understanding these options is key to building durable and cost-effective applications.",
+                    topics: [
+                        { title: 'Storage Models', content: `<div class='overflow-x-auto'><table class='w-full text-left border-collapse mt-2 table-border'><thead><tr class='bg-gray-100'><th class='p-3 border'>Model</th><th class='p-3 border'>Example Service</th><th class='p-3 border'>Use Case</th></tr></thead><tbody><tr><td class='p-3 border'>**Block Storage**</td><td class='p-3 border'>Amazon EBS</td><td class='p-3 border'>Databases, boot volumes, root volumes for EC2 instances.</td></tr><tr><td class='p-3 border'>**File Storage**</td><td class='p-3 border'>Amazon EFS / FSx</td><td class='p-3 border'>Shared content for multiple instances, home directories, lift-and-shift applications requiring shared file access.</td></tr><tr><td class='p-3 border'>**Object Storage**</td><td class='p-3 border'>Amazon S3</td><td class='p-3 border'>Data lakes, backups, static website hosting, content distribution, disaster recovery.</td></tr></tbody></table></div>`},
+                        { title: 'Amazon S3', content: `**Amazon Simple Storage Service (S3)** is an object storage service offering industry-leading scalability, data availability, security, and performance.
+                            <ul class='list-disc pl-5 mt-2 space-y-1'>
+                                <li>Data is stored in **buckets** as **objects**. Objects can be virtually unlimited in size.</li>
+                                <li>S3 offers various **storage classes** (e.g., S3 Standard, S3 Intelligent-Tiering, S3 Glacier) to optimize cost based on data access patterns and durability requirements.</li>
+                                <li>It's designed for 99.999999999% (11 nines) durability of objects over a given year.</li>
+                            </ul>`},
+                        { title: 'Data Migration', content: `AWS provides services to help you move data into and out of the cloud seamlessly:
+                            <ul class='list-disc pl-5 mt-2 space-y-1'>
+                                <li>**AWS DataSync** is an online data transfer service that simplifies, automates, and accelerates moving large amounts of data between on-premises storage and AWS storage services (like S3, EFS, FSx).</li>
+                                <li>**AWS Storage Gateway** is a hybrid cloud storage service that provides on-premises applications with seamless and secure access to virtually unlimited cloud storage. It supports file, volume, and tape interfaces.</li>
+                            </ul>`},
+                    ],
+                    knowledgeCheck: [
+                        { q: 'Which AWS storage service is designed specifically to provide a shared, scalable NFS file system for Linux-based workloads?', o: ['Amazon S3', 'Amazon EBS', 'Amazon FSx for Windows File Server', 'Amazon EFS'], a: 3 },
+                        { q: 'Which S3 storage class is designed to automatically move data between different access tiers based on changing access patterns to optimize costs?', o: ['S3 Standard', 'S3 Glacier Deep Archive', 'S3 Intelligent-Tiering', 'S3 One Zone-IA'], a: 2 },
+                    ]
+                },
+                6: {
+                    title: "Module 6: Database Services",
+                    description: "Provides an overview of AWS's portfolio of managed relational and NoSQL databases, caching, and migration tools. Learn to select the right database for your workload.",
+                    topics: [
+                        { title: 'Relational vs. NoSQL', content: `AWS offers a broad range of database services to suit different application needs:
+                            <ul class='list-disc pl-5 mt-2 space-y-1'>
+                                <li>**Relational databases** (e.g., MySQL, PostgreSQL, Oracle, SQL Server) use a structured schema, store data in tables with predefined relationships, and are ideal for transactional applications (OLTP) requiring ACID compliance.</li>
+                                <li>**NoSQL databases** (e.g., key-value, document, graph, in-memory) are flexible, schema-less, and scale horizontally, making them great for web-scale applications, gaming, mobile, and IoT that require high performance and flexibility.</li>
+                            </ul>`},
+                        { title: 'Amazon RDS and Aurora', content: `For relational databases, AWS offers fully managed services:
+                            <ul class='list-disc pl-5 mt-2 space-y-1'>
+                                <li>**Amazon Relational Database Service (RDS)** simplifies the setup, operation, and scaling of relational databases in the cloud. It supports popular engines including MySQL, PostgreSQL, MariaDB, Oracle, and SQL Server.</li>
+                                <li>**Amazon Aurora** is a MySQL and PostgreSQL-compatible relational database built for the cloud, offering superior performance, scalability, and durability. It provides up to 5x the throughput of standard MySQL and 3x the throughput of standard PostgreSQL.</li>
+                            </ul>`},
+                        { title: 'Amazon DynamoDB', content: `**Amazon DynamoDB** is a fully managed, serverless, key-value and document NoSQL database.
+                            <ul class='list-disc pl-5 mt-2 space-y-1'>
+                                <li>It delivers single-digit millisecond performance at any scale.</li>
+                                <li>DynamoDB is highly available and durable, automatically replicating data across multiple Availability Zones within a Region.</li>
+                                <li>It's a perfect fit for applications that need low-latency data access, regardless of traffic volume, such as gaming, ad tech, and IoT.</li>
+                            </ul>`},
+                    ],
+                    knowledgeCheck: [
+                        { q: 'Which database is a key-value and document database that can provide single-digit millisecond performance at any scale?', o: ['Amazon Aurora', 'Amazon Redshift', 'Amazon DynamoDB', 'Amazon RDS for MySQL'], a: 2 },
+                        { q: 'Which statement is true regarding an Amazon Aurora database?', o: ['Nine copies of the data are stored across three Availability Zones.', 'Aurora has a limit of five replicas.', 'Aurora is compatible with MySQL or PostgreSQL.', 'Multi-AZ deployments are not required for high availability.'], a: 2 },
+                    ]
+                },
+                7: {
+                    title: "Module 7: Monitoring and Scaling",
+                    description: "Focuses on monitoring, logging, and setting alarms, as well as strategies for load balancing and automatic scaling to ensure your applications are both resilient and cost-effective.",
+                     topics: [
+                        { title: 'Monitoring and Observability', content: `AWS provides comprehensive tools to monitor your resources and applications:
+                            <ul class='list-disc pl-5 mt-2 space-y-1'>
+                                <li>**Amazon CloudWatch** is the central service for collecting and tracking metrics, collecting and monitoring log files, and setting alarms. It provides data and actionable insights for monitoring your applications.</li>
+                                <li>**AWS CloudTrail** provides a record of actions taken by a user, role, or an AWS service. It helps with security analysis, resource change tracking, and operational troubleshooting.</li>
+                            </ul>`},
+                        { title: 'Elastic Load Balancing (ELB)', content: `**Elastic Load Balancing (ELB)** automatically distributes incoming application traffic across multiple targets, such as EC2 instances, containers, IP addresses, and Lambda functions.
+                            <ul class='list-disc pl-5 mt-2 space-y-1'>
+                                <li>The **Application Load Balancer (ALB)** operates at Layer 7 (HTTP/HTTPS) and is ideal for modern microservices and container-based applications, supporting path-based routing.</li>
+                                <li>The **Network Load Balancer (NLB)** operates at Layer 4 (TCP/UDP/TLS) and is optimized for extreme performance and static IP addresses.</li>
+                            </ul>`},
+                        { title: 'Auto Scaling', content: `**Amazon EC2 Auto Scaling** helps you maintain application availability and allows you to automatically add or remove EC2 instances according to conditions you define.
+                            <ul class='list-disc pl-5 mt-2 space-y-1'>
+                                <li>**Dynamic scaling** policies adjust capacity in response to changing demand based on metrics like CPU utilization or network I/O.</li>
+                                <li>**Scheduled scaling** allows you to set up your own scaling schedule based on predictable load changes.</li>
+                                <li>Auto Scaling helps optimize performance and costs by ensuring you have just the right amount of capacity.</li>
+                            </ul>`},
+                    ],
+                     knowledgeCheck: [
+                        { q: 'Which load balancer type operates at the application layer (Layer 7) and is best suited for routing HTTP/HTTPS traffic?', o: ['Network Load Balancer', 'Gateway Load Balancer', 'Application Load Balancer', 'Classic Load Balancer'], a: 2 },
+                        { q: 'Which scaling option automatically adjusts the number of EC2 instances in a group to meet current demand based on a metric like CPU utilization?', o: ['Scheduled scaling', 'Manual scaling', 'Predictive scaling', 'Dynamic scaling'], a: 3 },
+                    ]
+                },
+                8: {
+                    title: "Module 8: Automation",
+                    description: "Introduces Infrastructure as Code (IaC) and tools like AWS CloudFormation and AWS CDK for automating infrastructure deployment, promoting consistency and repeatability.",
+                     topics: [
+                        { title: 'Infrastructure as Code (IaC)', content: `**Infrastructure as Code (IaC)** is the practice of managing and provisioning infrastructure through code instead of manual processes.
+                            <ul class='list-disc pl-5 mt-2 space-y-1'>
+                                <li>This enables version control, automated deployments, and easier disaster recovery.</li>
+                                <li>IaC helps ensure consistency, reduces human error, and accelerates infrastructure deployments.</li>
+                            </ul>`},
+                        { title: 'AWS CloudFormation', content: `**AWS CloudFormation** is the primary IaC service on AWS.
+                            <ul class='list-disc pl-5 mt-2 space-y-1'>
+                                <li>You define your AWS resources and their configurations in a YAML or JSON **template**.</li>
+                                <li>CloudFormation provisions and configures those resources as a single unit called a **stack**.</li>
+                                <li>It manages the dependencies between resources and handles rollbacks in case of errors.</li>
+                            </ul>`},
+                        { title:'AWS Cloud Development Kit (CDK)', content: `The **AWS Cloud Development Kit (CDK)** is an open-source software development framework to define your cloud application resources using familiar programming languages.
+                            <ul class='list-disc pl-5 mt-2 space-y-1'>
+                                <li>You can use languages like TypeScript, Python, Java, C#, and Go.</li>
+                                <li>The CDK synthesizes your code into CloudFormation templates, which are then deployed to AWS.</li>
+                                <li>It allows developers to use high-level constructs and familiar tooling to build robust cloud applications.</li>
+                            </ul>`},
+                    ],
+                    knowledgeCheck: [
+                        { q: 'What is an AWS CloudFormation stack?', o: ['All of the provisioned resources that are defined in a template', 'All of the drifted resources in a template', 'A condition in which resources are added on top of each other', 'The properties of a single resource'], a: 0 },
+                    ]
+                },
+                9: {
+                    title: "Module 9: Containers",
+                    description: "Explains microservice architectures and the AWS services for running and managing containerized applications, such as Amazon ECS and EKS.",
+                     topics: [
+                        { title: 'Containers and Microservices', content: `**Microservices** architecture structures an application as a collection of loosely coupled, independently deployable services.
+                            <ul class='list-disc pl-5 mt-2 space-y-1'>
+                                <li>**Containers** provide a standard way to package an application's code, configurations, and dependencies into a single, isolated unit.</li>
+                                <li>They offer consistency across different environments, from development to production.</li>
+                                <li>Containers are lightweight and portable, making them ideal for microservices.</li>
+                            </ul>`},
+                        { title: 'Container Orchestration', content: `AWS offers managed services to run and orchestrate containers at scale:
+                            <ul class='list-disc pl-5 mt-2 space-y-1'>
+                                <li>**Amazon Elastic Container Service (ECS)** is a fully managed container orchestration service that makes it easy to run, stop, and manage Docker containers on a cluster.</li>
+                                <li>**Amazon Elastic Kubernetes Service (EKS)** is a fully managed Kubernetes service that allows you to run Kubernetes on AWS without needing to install, operate, and maintain your own Kubernetes control plane.</li>
+                            </ul>`},
+                        { title: 'AWS Fargate', content: `**AWS Fargate** is a serverless, pay-as-you-go compute engine for containers.
+                            <ul class='list-disc pl-5 mt-2 space-y-1'>
+                                <li>It works with both ECS and EKS, allowing you to run containers without having to provision, configure, or scale clusters of virtual machines.</li>
+                                <li>Fargate removes the operational overhead of managing servers, letting you focus entirely on your applications.</li>
+                            </ul>`},
+                    ],
+                    knowledgeCheck: [
+                        { q: 'Why would developers choose to deploy their containers to AWS Fargate over Amazon EC2?', o: ['To take control of their infrastructure', 'To avoid manual infrastructure updates', 'To optimize price for a large load', 'To manage their own patches and updates'], a: 1 },
+                    ]
+                },
+                10: {
+                    title: "Module 10: Networking 2",
+                    description: "Covers advanced networking topics, including hybrid connectivity, VPC peering, and simplified global network management to connect complex, distributed environments.",
+                     topics: [
+                        { title: 'Hybrid Connectivity', content: `AWS provides several options for connecting your on-premises networks to your VPCs:
+                            <ul class='list-disc pl-5 mt-2 space-y-1'>
+                                <li>**AWS Direct Connect** establishes a dedicated private network connection from your premises (e.g., data center, office) to AWS, providing consistent network performance.</li>
+                                <li>**AWS Site-to-Site VPN** creates a secure, encrypted connection over the public internet between your on-premises network and your VPC.</li>
+                            </ul>`},
+                        { title: 'Connecting VPCs', content: `You can connect multiple VPCs to create more complex network topologies:
+                            <ul class='list-disc pl-5 mt-2 space-y-1'>
+                                <li>**VPC Peering** connects two VPCs together, allowing instances in either VPC to communicate with each other as if they are within the same network.</li>
+                                <li>**AWS Transit Gateway** acts as a cloud router and simplifies network management by connecting thousands of VPCs and on-premises networks through a central hub. It simplifies complex routing challenges.</li>
+                            </ul>`},
+                        { title: 'VPC Endpoints (PrivateLink)', content: `**VPC Endpoints** powered by AWS PrivateLink enable you to privately connect your VPC to supported AWS services and VPC endpoint services hosted by other AWS accounts.
+                            <ul class='list-disc pl-5 mt-2 space-y-1'>
+                                <li>This connection is made without requiring an internet gateway, NAT device, VPN connection, or Direct Connect connection.</li>
+                                <li>Traffic between your VPC and the service does not leave the Amazon network, enhancing security and reducing latency.</li>
+                            </ul>`},
+                    ],
+                    knowledgeCheck: [
+                        { q: 'Which service provides a dedicated, private network connection from an on-premises data center to AWS?', o: ['AWS Site-to-Site VPN', 'VPC Peering', 'AWS Direct Connect', 'Internet Gateway'], a: 2 },
+                        { q: 'Which service simplifies the management of a global network by acting as a cloud router?', o: ['AWS Direct Connect', 'AWS Transit Gateway', 'VPC Peering', 'NAT Gateway'], a: 1 },
+                    ]
+                },
+                11: {
+                    title: "Module 11: Serverless",
+                    description: "Expands on serverless concepts, covering architecture patterns with AWS Lambda, Amazon API Gateway, and other event-driven services like SQS and SNS.",
+                    topics: [
+                        { title: 'Serverless Application Model', content: `The **Serverless Application Model (SAM)** allows you to build and run applications without thinking about servers. Key services often used in serverless architectures include:
+                            <ul class='list-disc pl-5 mt-2 space-y-1'>
+                                <li>**AWS Lambda** for compute (running code).</li>
+                                <li>**Amazon API Gateway** to create and manage APIs.</li>
+                                <li>**Amazon S3** for static content hosting and data storage.</li>
+                                <li>**Amazon DynamoDB** for NoSQL database needs.</li>
+                                <li>These services automatically scale and manage underlying infrastructure.</li>
+                            </ul>`},
+                        { title: 'Decoupling with SQS and SNS', content: `AWS provides messaging services to decouple components in your applications:
+                            <ul class='list-disc pl-5 mt-2 space-y-1'>
+                                <li>**Amazon Simple Queue Service (SQS)** is a fully managed message queue service that enables you to decouple and scale microservices, distributed systems, and serverless applications. It's a pull-based model.</li>
+                                <li>**Amazon Simple Notification Service (SNS)** is a fully managed publish/subscribe messaging service. It's a push-based model that allows you to send messages to a large number of subscribers simultaneously.</li>
+                                <li>Using SQS and SNS together, often in a "fan-out" pattern, allows a single message to be processed by multiple, independent, and durable consumers.</li>
+                            </ul>`},
+                        { title: 'Amazon API Gateway', content: `**Amazon API Gateway** is a fully managed service that makes it easy for developers to create, publish, maintain, monitor, and secure APIs at any scale.
+                            <ul class='list-disc pl-5 mt-2 space-y-1'>
+                                <li>It acts as a "front door" for applications to access backend services, such as AWS Lambda functions, EC2 instances, or any web application.</li>
+                                <li>API Gateway handles all the tasks involved in accepting and processing up to hundreds of thousands of concurrent API calls, including traffic management, authorization, and access control.</li>
+                            </ul>`},
+                    ],
+                    knowledgeCheck: [
+                         { q: 'Which service is best for decoupling microservices by providing a durable message queue for asynchronous communication?', o: ['Amazon SNS', 'Amazon SQS', 'Amazon Kinesis', 'Amazon EventBridge'], a: 1 },
+                    ]
+                },
+                12: {
+                    title: "Module 12: Edge Services",
+                    description: "Focuses on services at the AWS edge, including content delivery with Amazon CloudFront and DNS with Amazon Route 53 to improve performance and security for global users.",
+                    topics: [
+                        { title: 'Amazon CloudFront', content: `**Amazon CloudFront** is a fast content delivery network (CDN) service that securely delivers data, videos, applications, and APIs to customers globally with low latency and high transfer speeds.
+                            <ul class='list-disc pl-5 mt-2 space-y-1'>
+                                <li>It uses a global network of **Edge Locations** (or Points of Presence) to cache content closer to your users, reducing latency and improving performance.</li>
+                                <li>CloudFront integrates seamlessly with other AWS services like S3 and EC2.</li>
+                            </ul>`},
+                        { title: 'Amazon Route 53', content: `**Amazon Route 53** is a highly available and scalable cloud Domain Name System (DNS) web service.
+                            <ul class='list-disc pl-5 mt-2 space-y-1'>
+                                <li>It performs three main functions: domain registration, DNS routing, and health checking of your resources.</li>
+                                <li>Various **routing policies** (e.g., Simple, Weighted, Latency, Geolocation, Failover, Multivalue Answer) allow for sophisticated traffic management and high availability.</li>
+                                <li>Route 53 connects user requests to infrastructure running in AWS and outside of AWS.</li>
+                            </ul>`},
+                    ],
+                    knowledgeCheck: [
+                        { q: 'Which Route 53 routing policy would you use to route traffic based on the geographic location of your users?', o: ['Latency routing', 'Geolocation routing', 'Failover routing', 'Weighted routing'], a: 1 },
+                    ]
+                },
+                13: {
+                    title: "Module 13: Backup and Recovery",
+                    description: "Details strategies and services for data backup, disaster recovery (DR), and ensuring business continuity. Learn about RTO, RPO, and different DR strategies on AWS.",
+                    topics: [
+                        { title: 'RTO and RPO', content: `When planning for disaster recovery, two key metrics define your recovery objectives:
+                            <ul class='list-disc pl-5 mt-2 space-y-1'>
+                                <li>**Recovery Time Objective (RTO)**: The maximum acceptable delay between the interruption of service and restoration of service. It defines what is considered an acceptable time window when service is unavailable.</li>
+                                <li>**Recovery Point Objective (RPO)**: The maximum acceptable amount of time since the last data recovery point. It defines what is considered an acceptable loss of data.</li>
+                                <li>Lower RTO and RPO values generally imply higher cost and complexity.</li>
+                            </ul>`},
+                        { title: 'Disaster Recovery Strategies', content: `AWS enables various disaster recovery strategies, offering a spectrum of cost and recovery capabilities:
+                            <ul class='list-disc pl-5 mt-2'>
+                                <li>**Backup and Restore**: The simplest and lowest-cost strategy, with the highest RTO/RPO. Data is backed up and restored to a new environment after a disaster.</li>
+                                <li>**Pilot Light**: A small, minimal version of your environment is always running in the recovery Region, ready to scale up in case of disaster.</li>
+                                <li>**Warm Standby**: A scaled-down but fully functional copy of your production environment is always running in the recovery Region, allowing for faster recovery than pilot light.</li>
+                                <li>**Multi-site Active-Active**: Runs a full production environment in multiple Regions simultaneously, offering the lowest RTO and RPO (near-zero downtime and data loss) but at the highest cost and complexity.</li>
+                            </ul>`},
+                    ],
+                    knowledgeCheck: [
+                         { q: 'Which disaster recovery strategy typically has the lowest cost and highest RPO/RTO?', o: ['Pilot Light', 'Warm Standby', 'Multi-site Active-Active', 'Backup and Restore'], a: 3 },
+                    ]
+                },
+            }
+        }
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            const moduleNavContainer = document.getElementById('module-navigation');
+            const mobileModuleNavContainer = document.getElementById('mobile-module-navigation');
+            const mainContentContainer = document.getElementById('main-content');
+            
+            const menuButton = document.getElementById('menu-button');
+            const closeMenuButton = document.getElementById('close-menu-button');
+            const mobileMenu = document.getElementById('mobile-menu');
+            const mobileMenuPanel = mobileMenu.querySelector('div');
+
+            // Function to apply bold and dark orange color to text surrounded by **
+            const formatBoldOrange = (text) => {
+                return text.replace(/\*\*(.*?)\*\*/g, '<strong><span class="text-orange-700">$1</span></strong>');
+            };
+
+            const renderNavigation = (container) => {
+                 // Add Course Overview link
+                const overviewNavItem = document.createElement('a');
+                overviewNavItem.href = '#';
+                overviewNavItem.dataset.moduleId = 0;
+                overviewNavItem.className = 'module-nav-item flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 smooth-transition';
+                overviewNavItem.innerHTML = `
+                    <span class="mr-3 h-7 w-7 flex items-center justify-center text-xs font-bold bg-gray-200 text-gray-600 rounded-full flex-shrink-0"> 📚</span>
+                    <span class="text-sm">Course Overview</span>
+                `;
+                container.appendChild(overviewNavItem);
+
+                 courseData.modules.filter(m => m.id !== 0).forEach(module => { // Filter out the overview module itself
+                    const navItem = document.createElement('a');
+                    navItem.href = '#';
+                    navItem.dataset.moduleId = module.id;
+                    navItem.className = 'module-nav-item flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 smooth-transition'; /* Increased padding, rounded corners */
+                    navItem.innerHTML = `
+                        <span class="mr-3 h-7 w-7 flex items-center justify-center text-xs font-bold bg-gray-200 text-gray-600 rounded-full flex-shrink-0"> ${module.id}</span>
+                        <span class="text-sm">${module.title}</span>
+                    `;
+                    container.appendChild(navItem);
+                });
+            }
+
+            const renderRoadmap = () => {
+                const roadmapContainer = document.createElement('div');
+                roadmapContainer.className = 'bg-white p-6 rounded-xl shadow-lg mb-10'; /* More shadow, rounded */
+                roadmapContainer.innerHTML = `<h2 class="text-2xl font-bold mb-4 text-gray-800">Course Roadmap</h2><p class="text-gray-600 mb-6">This shows the learning path for the Architecting on AWS course. Click any module to jump directly to its content.</p>`;
+
+                const roadmapScroll = document.createElement('div');
+                roadmapScroll.className = 'overflow-x-auto pb-4';
+
+                const roadmap = document.createElement('div');
+                roadmap.id = 'course-roadmap';
+                roadmap.className = 'flex items-start space-x-3 py-2'; /* Changed to items-start to allow text to align at top, then center content inside node */
+
+                courseData.modules.filter(m => m.id !== 0).forEach((module, index) => { // Filter out the overview module itself
+                    const isLast = index === courseData.modules.filter(m => m.id !== 0).length - 1;
+                    const nodeHtml = `
+                        <div class="roadmap-node flex flex-col items-center cursor-pointer flex-shrink-0" data-module-id="${module.id}">
+                            <div class="roadmap-circle w-9 h-9 rounded-full border-2 border-gray-300 bg-white flex items-center justify-center font-bold text-gray-500 smooth-transition text-sm"> ${module.id}</div>
+                            <span class="roadmap-label text-xs text-center mt-2 text-gray-600 font-medium smooth-transition whitespace-nowrap max-w-[100px] overflow-hidden text-ellipsis">${module.title}</span>
+                        </div>
+                        ${!isLast ? '<div class="roadmap-connector flex-1 h-1 rounded-full"></div>' : ''}
+                    `;
+                    roadmap.innerHTML += nodeHtml;
+                });
+                
+                roadmapScroll.appendChild(roadmap);
+                roadmapContainer.appendChild(roadmapScroll);
+                return roadmapContainer;
+            }
+
+            const renderModuleContent = (moduleId) => {
+                // If module ID is 0, render the overview content
+                if (moduleId === 0) {
+                    mainContentContainer.innerHTML = '';
+                    const contentWrapper = document.createElement('div');
+                    contentWrapper.className = 'content-fade-in';
+                    contentWrapper.innerHTML = courseData.overviewContent;
+                    mainContentContainer.appendChild(contentWrapper);
+                    updateActiveState(moduleId);
+                    return;
+                }
+
+                const module = courseData.content[moduleId];
+                const moduleMeta = courseData.modules.find(m => m.id == moduleId);
+                if (!module) return;
+
+                mainContentContainer.innerHTML = ''; 
+                mainContentContainer.appendChild(renderRoadmap());
+
+                const contentWrapper = document.createElement('div');
+                contentWrapper.className = 'content-fade-in';
+                
+                let labHtml = '';
+                if(moduleMeta.lab) {
+                    labHtml = `
+                        <div class="mt-8 bg-blue-50 border-l-4 border-[#156CE0] p-5 rounded-r-lg shadow-sm">
+                            <div class="flex items-center">
+                                <div class="flex-shrink-0">
+                                    <svg class="h-6 w-6 text-[#156CE0]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                        <path fill-rule="evenodd" d="M10.868 2.884c.321-.772.142-1.68-.43-2.252a1.5 1.5 0 00-2.253.43l-7 16c-.32.772-.142 1.68.43 2.252a1.5 1.5 0 002.253-.43l7-16zm-1.736 9.403a.75.75 0 10-1.264 1.432.75.75 0 001.264-1.432z" clip-rule="evenodd" />
+                                    </svg>
+                                </div>
+                                <div class="ml-4">
+                                    <p class="text-base font-medium text-blue-800">Hands-on Lab: <span class="font-semibold">${moduleMeta.lab}</span></p>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                contentWrapper.innerHTML = `
+                    <article class="bg-white p-8 rounded-xl shadow-lg">
+                        <h2 class="text-4xl font-bold text-gray-900 leading-tight">${module.title}</h2>
+                        <p class="mt-3 text-lg text-gray-600">${module.description}</p>
+                        ${labHtml}
+                    </article>
+
+                    <div class="mt-10">
+                        <h3 class="text-3xl font-bold mb-6 text-gray-800">Key Topics</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            ${module.topics.map(topic => `
+                                <div class="bg-white p-7 rounded-xl shadow-lg border border-gray-100">
+                                    <h4 class="text-xl font-semibold text-gray-800 mb-3">${topic.title}</h4>
+                                    <div class="mt-2 text-gray-600 leading-relaxed">${formatBoldOrange(topic.content)}</div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+
+                    <div class="mt-10">
+                        <h3 class="text-3xl font-bold mb-6 text-gray-800">Knowledge Check</h3>
+                        <div class="space-y-6">
+                            ${module.knowledgeCheck.map((check, index) => `
+                                <div class="knowledge-check-card bg-white p-7 rounded-xl shadow-lg border border-gray-100">
+                                    <p class="font-semibold text-gray-800 text-lg mb-4">${index + 1}. ${formatBoldOrange(check.q)}</p>
+                                    <div class="space-y-3">
+                                        ${check.o.map((option, optIndex) => `
+                                            <div id="q${index}-opt${optIndex}" class="option-item border border-gray-200 p-3 rounded-md smooth-transition cursor-pointer hover:bg-gray-50 text-gray-700">${formatBoldOrange(option)}</div>
+                                        `).join('')}
+                                    </div>
+                                    <button class="reveal-answer-btn mt-6 px-6 py-3 bg-[#156CE0] text-white text-base font-medium rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#156CE0] shadow-md hover:shadow-lg smooth-transition" data-question-index="${index}">Reveal Answer</button>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+
+                mainContentContainer.appendChild(contentWrapper);
+                updateActiveState(moduleId);
+
+                mainContentContainer.querySelectorAll('.reveal-answer-btn').forEach(button => {
+                    button.addEventListener('click', (e) => {
+                        const questionIndex = e.target.dataset.questionIndex;
+                        const questionData = module.knowledgeCheck[questionIndex];
+                        const correctAnswers = Array.isArray(questionData.a) ? questionData.a : [questionData.a];
+
+                        correctAnswers.forEach(correctIndex => {
+                            const correctOption = document.getElementById(`q${questionIndex}-opt${correctIndex}`);
+                            if (correctOption) {
+                                correctOption.classList.add('answer-revealed', 'border-l-4');
+                            }
+                        });
+                        
+                        e.target.disabled = true;
+                        e.target.textContent = 'Answer Revealed';
+                        e.target.classList.add('opacity-50', 'cursor-not-allowed');
+                    });
+                });
+            }
+
+            const updateActiveState = (moduleId) => {
+                document.querySelectorAll('.module-nav-item').forEach(item => {
+                    item.classList.toggle('active', item.dataset.moduleId == moduleId);
+                });
+                document.querySelectorAll('.roadmap-node').forEach(node => {
+                     node.classList.toggle('active', node.dataset.moduleId == moduleId);
+                });
+            }
+            
+            const handleNavigation = (e) => {
+                 if (e.target.closest('.module-nav-item')) {
+                    e.preventDefault();
+                    const moduleId = parseInt(e.target.closest('.module-nav-item').dataset.moduleId);
+                    renderModuleContent(moduleId);
+                    if (mobileMenu.classList.contains('md:hidden') === false) {
+                        toggleMobileMenu();
+                    }
+                }
+                if (e.target.closest('.roadmap-node')) {
+                    e.preventDefault();
+                    const moduleId = parseInt(e.target.closest('.roadmap-node').dataset.moduleId);
+                    renderModuleContent(moduleId);
+                    mainContentContainer.scrollTop = 0;
+                }
+            }
+            
+            const toggleMobileMenu = () => {
+                const isHidden = mobileMenu.classList.contains('hidden');
+                if (isHidden) {
+                    mobileMenu.classList.remove('hidden');
+                    requestAnimationFrame(() => {
+                        mobileMenuPanel.classList.remove('-translate-x-full');
+                    });
+                } else {
+                    mobileMenuPanel.classList.add('-translate-x-full');
+                    mobileMenuPanel.addEventListener('transitionend', () => {
+                        mobileMenu.classList.add('hidden');
+                    }, { once: true });
+                }
+            };
+            
+            renderNavigation(moduleNavContainer);
+            renderNavigation(mobileModuleNavContainer);
+            
+            document.body.addEventListener('click', handleNavigation);
+            
+            menuButton.addEventListener('click', toggleMobileMenu);
+            closeMenuButton.addEventListener('click', toggleMobileMenu);
+            mobileMenu.addEventListener('click', (e) => {
+                if (e.target === mobileMenu) {
+                    toggleMobileMenu();
+                }
+            });
+
+            renderModuleContent(0); // Render the Course Overview on initial load
+        });
+    </script>
+</body>
+</html>
